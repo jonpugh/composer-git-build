@@ -25,7 +25,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface
     public static function getSubscribedEvents()
     {
         return array(
-            ScriptEvents::POST_INSTALL_CMD => 'postCmd',
+            'post-install-cmd' => 'postInstallCommand',
         );
     }
     
@@ -34,8 +34,8 @@ class Plugin implements PluginInterface, EventSubscriberInterface
      *
      * @param \Composer\Script\Event $event
      */
-    public function postCmd(\Composer\Script\Event $event) {
-        $this->io->writeln(['POST_INSTALL_CMD => postCmd']);
+    public function postInstallCommand(\Composer\Script\Event $event) {
+        $this->io->writeln(['postInstallCommand']);
     }
     
     
