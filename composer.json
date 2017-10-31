@@ -1,0 +1,23 @@
+{
+    "name": "jonpugh/composer-git-build",
+    "description": "Commands to get vendor and other ignored files into git,",
+    "type": "composer-plugin",
+    "require": {
+        "composer-plugin-api": "^1.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "jonpugh\\ComposerGitBuild\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Jon Pugh",
+            "email": "jon@thinkdrop.net"
+        }
+    ],
+    "minimum-stability": "dev",
+    "extra": {
+        "class": "jonpugh\\ComposerGitBuild\\Plugin"
+    }
+}
