@@ -8,6 +8,8 @@ use Composer\IO\IOInterface;
 use Composer\Plugin\PluginInterface;
 use Composer\Plugin\PluginEvents;
 use Composer\Plugin\PreFileDownloadEvent;
+use Composer\Script\ScriptEvents;
+
 
 class Plugin implements PluginInterface, EventSubscriberInterface
 {
@@ -33,7 +35,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface
      * @param \Composer\Script\Event $event
      */
     public function postCmd(\Composer\Script\Event $event) {
-        $this->handler->onPostCmdEvent($event);
+        $this->io->writeln(['POST_INSTALL_CMD => postCmd']);
     }
     
     
