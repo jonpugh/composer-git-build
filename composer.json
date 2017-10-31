@@ -3,7 +3,8 @@
     "description": "Commands to get vendor and other ignored files into git,",
     "type": "composer-plugin",
     "require": {
-        "composer-plugin-api": "^1.1"
+        "composer-plugin-api": "^1.1",
+        "cpliakas/git-wrapper": "^1.7"
     },
     "autoload": {
         "psr-4": {
