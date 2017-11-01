@@ -61,22 +61,30 @@ class Command extends BaseCommand
         $this->addOption(
             'ignore-dirty',
             NULL,
-            InputOption::VALUE_OPTIONAL,
-            'Allow committing even if git working copy is dirty (has modified files).',
-            FALSE
+            InputOption::VALUE_NONE,
+            'Allow committing even if git working copy is dirty (has modified files).'
         );
         $this->addOption(
             'dry-run',
             NULL,
-            InputOption::VALUE_OPTIONAL,
-            'Build and commit to the repository but do not push.',
-            FALSE
+            InputOption::VALUE_NONE,
+            'Build and commit to the repository but do not push.'
         );
     }
     
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         $this->io = new Style($input, $output);
+
+        if (!$this->isGitMinimumVersionSatisfied()) {
+            $this->io->error("Your git is out of date. Please update git to 2.0 or newer.");
+            exit(1);
+        }
+    
+        if ($input->getOption('dry-run')) {
+            $this->io->warning("This will be a dry run, the artifact will not be pushed.");
+        }
+        
         $this->workingDir = $this->getWorkingDir($input);
 
         $this->io->text('Determining git information for directory ' . $this->workingDir);
@@ -137,4 +145,19 @@ class Command extends BaseCommand
         return $output;
     }
     
+    /**
+     * Verifies that installed minimum git version is met.
+     *
+     * @param string $minimum_version
+     *   The minimum git version that is required.
+     *
+     * @return bool
+     *   TRUE if minimum version is satisfied.
+     */
+    public function isGitMinimumVersionSatisfied($minimum_version = '2.0') {
+        if (version_compare($this->shell_exec("git --version | cut -d' ' -f3"), $minimum_version, '>=')) {
+            return TRUE;
+        }
+        return FALSE;
+    }
 }
