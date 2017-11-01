@@ -27,6 +27,25 @@ In your .gitignore:
 ```
 (Not Yet Functional!)
 
+Then there is a new composer command:
+
+```
+  git-build        Add all vendor code and ignored dependencies to git.
+```
+
+```
+Usage:
+  git-build [options]
+
+Options:
+  -b, --branch=BRANCH            Branch to create.
+  -t, --tag=TAG                  Tag to create.
+  -m, --commit-msg=COMMIT-MSG    Commit message to use.
+      --ignore-dirty             Allow committing even if git working copy is dirty (has modified files).
+      --dry-run                  Build and commit to the repository but do not push.
+```
+
+
 ## Thanks
 
 - @acquia/blt team for getting the ball rolling.
