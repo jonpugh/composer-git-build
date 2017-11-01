@@ -42,10 +42,12 @@ class Command extends BaseCommand
     
     protected function execute(InputInterface $input, OutputInterface $output)
     {
-        $this->io = new SymfonyStyle($input, $output);
+        $this->io = new Style($input, $output);
         $this->workingDir = $this->getWorkingDir($input);
-        $this->comment('Determining git toplevel from directory ' . $this->workingDir);
 
+        $this->io->text('Determining git information for directory ' . $this->workingDir);
+
+        // Get and Check Repo Directory.
         $this->repoDir = $this->shell_exec('git rev-parse --show-toplevel', $this->workingDir);
     
         if (empty($this->repoDir)) {
@@ -53,50 +55,44 @@ class Command extends BaseCommand
             exit(1);
         }
         else {
-            $this->io->success('Found git working copy in folder: ' .  $this->repoDir);
+            $this->io->comment('Found git working copy in folder: ' .  $this->repoDir);
         }
     
-        $this->io->caution('Coming soon: adding code to git repo...');
-    
-    }
-    
-    /**
-     * @param array|string $message
-     * @param bool         $newLine
-     */
-    public function comment($message, $newLine = true)
-    {
-        $message = sprintf('<comment> %s</comment>', $message);
-        if ($newLine) {
-            $this->io->writeln($message);
-        } else {
-            $this->io->write($message);
+        // Get and Check Current git reference.
+        if ($this->getCurrentBranchName()) {
+            $this->io->comment('Found current git reference: ' .  $this->getCurrentBranchName());
+        }
+        else {
+            $this->io->error('No git reference detected in ' . $this->workingDir);
+            exit(1);
         }
     }
     
     /**
      * Gets the default branch name for the deployment artifact.
      */
+    protected function getCurrentBranchName() {
+        return $this->shell_exec("git rev-parse --abbrev-ref HEAD", $this->repoDir);
+    }
+    
+    /**
+     * Gets the default branch name for the deployment artifact.
+     */
     protected function getDefaultBranchName() {
-//        chdir($this->getConfigValue('repo.root'));
-        $git_current_branch = $this->shell_exec("git rev-parse --abbrev-ref HEAD", $this->repoDir);
-        $default_branch = $git_current_branch . '-build';
+        $default_branch = $this->getCurrentBranchName() . '-build';
         return $default_branch;
     }
     
     /**
+     * Just return the cwd. Composer automatically sets CWD to the working-dir option.
+     *
      * @param  InputInterface    $input
      * @throws \RuntimeException
      * @return string
      */
     private function getWorkingDir(InputInterface $input)
     {
-        $workingDir = $input->getParameterOption(array('--working-dir', '-d'));
-        if (false !== $workingDir && !is_dir($workingDir)) {
-            throw new \RuntimeException('Invalid working directory specified, '.$workingDir.' does not exist.');
-        }
-        
-        return $workingDir;
+        return getcwd();
     }
     
     protected function shell_exec($cmd, $dir = '') {
