@@ -3,6 +3,7 @@
 namespace jonpugh\ComposerGitBuild;
 
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Composer\Command\BaseCommand;
 use Symfony\Component\Console\Style\SymfonyStyle;
@@ -38,6 +39,39 @@ class Command extends BaseCommand
     {
         $this->setName('git-build');
         $this->setDescription('Add all vendor code and ignored dependencies to git.');
+        
+        $this->addOption(
+            'branch',
+            'b',
+            InputOption::VALUE_REQUIRED,
+            'Branch to create.'
+        );
+        $this->addOption(
+            'tag',
+            't',
+            InputOption::VALUE_REQUIRED,
+            'Tag to create.'
+        );
+        $this->addOption(
+            'commit-msg',
+            'm',
+            InputOption::VALUE_REQUIRED,
+            'Commit message to use.'
+        );
+        $this->addOption(
+            'ignore-dirty',
+            NULL,
+            InputOption::VALUE_OPTIONAL,
+            'Allow committing even if git working copy is dirty (has modified files).',
+            FALSE
+        );
+        $this->addOption(
+            'dry-run',
+            NULL,
+            InputOption::VALUE_OPTIONAL,
+            'Build and commit to the repository but do not push.',
+            FALSE
+        );
     }
     
     protected function execute(InputInterface $input, OutputInterface $output)
