@@ -21,6 +21,10 @@ class Plugin implements PluginInterface, Capable
     {
         $this->composer = $composer;
         $this->io = $io;
+
+
+//        print_r($this->composer->getPackage()->getConfig());
+//        die;
     }
     
     public function getCapabilities()
