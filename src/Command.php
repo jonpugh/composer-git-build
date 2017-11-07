@@ -210,8 +210,12 @@ class Command extends BaseCommand
     protected function shell_exec($cmd, $dir = '') {
         $oldWorkingDir = getcwd();
         chdir($dir? $dir: getcwd());
-        $output = trim(shell_exec($cmd));
+        exec($cmd, $output, $return);
+        $output = trim(implode("\n", $output));
         chdir($oldWorkingDir);
+        if ($return !== 0) {
+            throw new \ErrorException("Command `$cmd` failed with exit code $return");
+        }
         return $output;
     }
     
