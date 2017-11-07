@@ -179,7 +179,7 @@ class Command extends BaseCommand
      * @param $message
      */
     protected function say($message) {
-        $this->io->comment($message);
+        $this->io->text($message);
     }
     
     /**
@@ -398,24 +398,25 @@ class Command extends BaseCommand
         if ($this->deployDir != $this->workingDir) {
             $this->shell_exec("rm -rf $this->deployDir");
             $this->shell_exec("mkdir $this->deployDir");
-            $this->shell_exec("git init");
+            $this->shell_exec("git init", $this->deployDir);
         }
     
         $this->say("Altering .gitignore...");
         
-        if (strpos(file_get_contents('.gitignore'), $this->ignoreDelimeter) === FALSE) {
+        if (strpos(file_get_contents($this->deployDir . '/.gitignore'), $this->ignoreDelimeter) === FALSE) {
             $this->say("The git build ignore delimiter was not found in your .gitignore file. All entries will be removed from your .gitignore file. Add '{$this->ignoreDelimeter} to save entries to .gitignore in the build.");
         }
-        $this->shell_exec("sed -i '1,/{$this->ignoreDelimeter}/d' .gitignore");
+        
+        $this->shell_exec("sed -i '1,/{$this->ignoreDelimeter}/d' .gitignore", $this->deployDir);
 
         if ($this->getConfigValue("git.user.name") &&
             $this->getConfigValue("git.user.email")) {
             $git_user = $this->getConfigValue("git.user.name");
             $git_email = $this->getConfigValue("git.user.email");
-            $this->shell_exec("git config --local --add user.name '$git_user'");
+            $this->shell_exec("git config --local --add user.name '$git_user'", $this->deployDir);
             $this->shell_exec(
                 "git config --local --add user.email '$git_email'"
-            );
+                , $this->deployDir);
         }
             //              $this->taskExecStack()
 //                ->setVerbosityThreshold(VerbosityThresholdInterface::VERBOSITY_VERBOSE)
@@ -480,7 +481,7 @@ class Command extends BaseCommand
         
         // Remote may already exist.
         try {
-            $this->shell_exec("git remote add $remote_name $remote_url");
+            $this->shell_exec("git remote add $remote_name $remote_url", $this->deployDir);
         }
         catch (\ErrorException $e) {
             if ($e->getCode() == 128) {
@@ -515,7 +516,7 @@ class Command extends BaseCommand
         //      ->exec("git checkout -b {$this->branchName}")
         //      ->run();
         
-        $this->shell_exec("git checkout -b {$this->branchName}");
+        $this->shell_exec("git checkout -b {$this->branchName}", $this->deployDir);
     }
     
     /**
@@ -527,8 +528,8 @@ class Command extends BaseCommand
         $remote_name = md5($remote_url);
         
         $this->say("Merging upstream changes into local artifact...");
-        $this->shell_exec("git fetch $remote_name {$this->branchName}");
-        $this->shell_exec("git merge $remote_name/{$this->branchName}");
+        $this->shell_exec("git fetch $remote_name {$this->branchName}", $this->deployDir);
+        $this->shell_exec("git merge $remote_name/{$this->branchName}", $this->deployDir);
         
         //    $this->taskExecStack()
         //      ->dir($this->deployDir)
@@ -615,7 +616,7 @@ class Command extends BaseCommand
      */
     protected function composerInstall() {
         $this->say("Rebuilding composer dependencies for production...");
-        $this->shell_exec("composer install --no-dev --no-interaction --optimize-autoloader");
+        $this->shell_exec("composer install --no-dev --no-interaction --optimize-autoloader", $this->deployDir);
         //    $this->taskDeleteDir([$this->deployDir . '/vendor'])
         //      ->setVerbosityThreshold(VerbosityThresholdInterface::VERBOSITY_VERBOSE)
         //      ->run();
@@ -650,8 +651,8 @@ class Command extends BaseCommand
         
         $this->logger->comment("Removing .git subdirectories...");
         
-        $this->shell_exec("find '{$this->deployDir}/vendor' -type d | grep '\.git' | xargs rm -rf");
-        $this->shell_exec("find '{$this->deployDir}/docroot' -type d | grep '\.git' | xargs rm -rf");
+        $this->shell_exec("find '{$this->deployDir}/vendor' -type d | grep '\.git' | xargs rm -rf", $this->deployDir);
+        $this->shell_exec("find '{$this->deployDir}/docroot' -type d | grep '\.git' | xargs rm -rf", $this->deployDir);
         //    $this->taskExecStack()
         //      ->exec("find '{$this->deployDir}/vendor' -type d | grep '\.git' | xargs rm -rf")
         //      ->exec("find '{$this->deployDir}/docroot' -type d | grep '\.git' | xargs rm -rf")
@@ -670,7 +671,7 @@ class Command extends BaseCommand
         
         foreach ($files->getIterator() as $item) {
             $filepath = $item->getRealPath();
-            $this->shell_exec("rm -rf $filepath");
+            $this->shell_exec("rm -rf $filepath", $this->deployDir);
         }
         
         $finder = new Finder();
@@ -681,7 +682,7 @@ class Command extends BaseCommand
         
         foreach ($files->getIterator() as $item) {
             $filepath = $item->getRealPath();
-            $this->shell_exec("rm -rf $filepath");
+            $this->shell_exec("rm -rf $filepath", $this->deployDir);
         }
         
         $this->logger->comment("Removing .txt files...");
@@ -739,8 +740,8 @@ class Command extends BaseCommand
      */
     protected function commit() {
         $this->say("Committing artifact to <comment>{$this->branchName}</comment>...");
-        $this->shell_exec("git add -A");
-        $this->shell_exec("git commit --quiet -m '{$this->commitMessage}'");
+        $this->shell_exec("git add -A", $this->deployDir);
+        $this->shell_exec("git commit --quiet -m '{$this->commitMessage}'", $this->deployDir);
         
         //    $result = $this->taskExecStack()
         //      ->dir($this->deployDir)
@@ -770,7 +771,7 @@ class Command extends BaseCommand
         //      ->dir($this->deployDir);
         foreach ($this->getConfigValue('git.remotes') as $remote) {
             $remote_name = md5($remote);
-            $this->shell_exec("git push $remote_name $identifier");
+            $this->shell_exec("git push $remote_name $identifier", $this->deployDir);
             //      $task->exec("git push $remote_name $identifier");
             
         }
@@ -786,7 +787,7 @@ class Command extends BaseCommand
      */
     protected function cutTag() {
         
-        $this->shell_exec("git tag -a {$this->tagName} -m '{$this->commitMessage}'");
+        $this->shell_exec("git tag -a {$this->tagName} -m '{$this->commitMessage}'", $this->deployDir);
         //    $this->taskExecStack()
         //      ->exec("git tag -a {$this->tagName} -m '{$this->commitMessage}'")
         //      ->setVerbosityThreshold(VerbosityThresholdInterface::VERBOSITY_VERBOSE)
@@ -814,10 +815,11 @@ class Command extends BaseCommand
         if ($this->workingDir == $this->deployDir) {
             $this->say("Returning {$this->workingDir} to git reference {$this->initialGitRef}...");
             $this->shell_exec("git checkout {$this->initialGitRef}", $this->workingDir);
+
+            $this->say("Deleting temporary branch...");
+            $branch_name = $this->getDefaultBranchName() . '-temp';
+            $this->shell_exec("git branch -D {$branch_name}", $this->workingDir, $this->deployDir);
         }
     
-        $this->say("Deleting temporary branch...");
-        $branch_name = $this->getDefaultBranchName() . '-temp';
-        $this->shell_exec("git branch -D {$branch_name}", $this->workingDir);
     }
 }
