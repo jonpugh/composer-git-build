@@ -214,7 +214,7 @@ class Command extends BaseCommand
         $output = trim(implode("\n", $output));
         chdir($oldWorkingDir);
         if ($return !== 0) {
-            throw new \ErrorException("Command `$cmd` failed with exit code $return");
+            throw new \ErrorException("The command `$cmd` failed with exit code $return.");
         }
         return $output;
     }
