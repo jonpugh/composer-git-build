@@ -41,6 +41,12 @@ class Command extends BaseCommand
     protected $deployDir;
 
     /**
+     * The git reference of this project before any changes are made.
+     * @var String
+     */
+    protected $initialGitRef;
+
+    /**
      * The options from the project's composer.json "config" section.
      *
      * @var array
@@ -136,6 +142,7 @@ class Command extends BaseCommand
         // Get and Check Current git reference.
         if ($this->getCurrentBranchName()) {
             $this->io->comment('Found current git reference: ' .  $this->getCurrentBranchName());
+            $this->initialGitRef = $this->getCurrentBranchName();
         }
         else {
             $this->io->error('No git reference detected in ' . $this->workingDir);
@@ -355,6 +362,7 @@ class Command extends BaseCommand
     $this->commit();
     $this->cutTag();
     $this->push($this->tagName, $options);
+    $this->cleanup();
   }
 
   /**
@@ -785,7 +793,21 @@ class Command extends BaseCommand
 //
 //    $this->updateSites();
 //  }
-
+    
+    /**
+     * Checkout initial git reference.
+     */
+    protected function cleanup() {
+        if ($this->workingDir == $this->deployDir) {
+            $this->say("Returning {$this->workingDir} to git reference {$this->initialGitRef}...");
+            $this->shell_exec("git checkout {$this->initialGitRef}", $this->workingDir);
+        }
+    
+        $this->say("Deleting temporary branch...");
+        $branch_name = $this->getDefaultBranchName() . '-temp';
+        $this->shell_exec("git branch -D {$branch_name}", $this->workingDir);
+    }
+    
   /**
    * @param $value
    *
