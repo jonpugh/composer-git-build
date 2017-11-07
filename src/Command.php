@@ -96,7 +96,7 @@ class Command extends BaseCommand
       $config_defaults = [
         'repo.root' => $this->deployDir,
       ];
-      print_r($this->getComposer()->getPackage()->getConfig());
+
       $this->config = array_merge($config_defaults, $this->getComposer()->getPackage()->getConfig());
 
     }
