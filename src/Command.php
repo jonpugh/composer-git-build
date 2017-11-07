@@ -22,7 +22,6 @@ class Command extends BaseCommand
     protected $branchName;
     protected $commitMessage;
     protected $excludeFileTemp;
-    protected $deployDir;
 
     /**
      * @var SymfonyStyle
@@ -39,7 +38,7 @@ class Command extends BaseCommand
      * The directory containing the git repository.
      * @var String
      */
-    protected $repoDir;
+    protected $deployDir;
 
     /**
      * The options from the project's composer.json "config" section.
@@ -91,12 +90,13 @@ class Command extends BaseCommand
      */
     public function initialize(InputInterface $input, OutputInterface $output) {
       $this->workingDir = $this->getWorkingDir($input);
-      $this->repoDir = $this->workingDir;
+      $this->deployDir = $this->workingDir;
 
 
       $config_defaults = [
-        'repo.root' => $this->repoDir,
+        'repo.root' => $this->deployDir,
       ];
+      print_r($this->getComposer()->getPackage()->getConfig());
       $this->config = array_merge($config_defaults, $this->getComposer()->getPackage()->getConfig());
 
     }
@@ -123,14 +123,14 @@ class Command extends BaseCommand
         $this->io->text('Determining git information for directory ' . $this->workingDir);
 
         // Get and Check Repo Directory.
-        $this->repoDir = $this->shell_exec('git rev-parse --show-toplevel', $this->workingDir);
+        $this->deployDir = $this->shell_exec('git rev-parse --show-toplevel', $this->workingDir);
     
-        if (empty($this->repoDir)) {
+        if (empty($this->deployDir)) {
             $this->io->error('No git repository found in composer project located at ' . $this->workingDir);
             exit(1);
         }
         else {
-            $this->io->comment('Found git working copy in folder: ' .  $this->repoDir);
+            $this->io->comment('Found git working copy in folder: ' .  $this->deployDir);
         }
     
         // Get and Check Current git reference.
@@ -184,7 +184,7 @@ class Command extends BaseCommand
      * Gets the default branch name for the deployment artifact.
      */
     protected function getCurrentBranchName() {
-        return $this->shell_exec("git rev-parse --abbrev-ref HEAD", $this->repoDir);
+        return $this->shell_exec("git rev-parse --abbrev-ref HEAD", $this->deployDir);
     }
     
 //    /**
