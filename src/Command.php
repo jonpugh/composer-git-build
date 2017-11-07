@@ -74,6 +74,7 @@ class Command extends BaseCommand
     
     protected function execute(InputInterface $input, OutputInterface $output)
     {
+        $options = $input->getOptions();
         $this->io = new Style($input, $output);
 
         if (!$this->isGitMinimumVersionSatisfied()) {
@@ -84,7 +85,9 @@ class Command extends BaseCommand
         if ($input->getOption('dry-run')) {
             $this->io->warning("This will be a dry run, the artifact will not be pushed.");
         }
-        
+        $this->checkDirty($options);
+
+
         $this->workingDir = $this->getWorkingDir($input);
 
         $this->io->text('Determining git information for directory ' . $this->workingDir);
@@ -159,5 +162,29 @@ class Command extends BaseCommand
             return TRUE;
         }
         return FALSE;
+    }
+
+    /**
+     * Checks to see if current git branch has uncommitted changes.
+     *
+     * @throws \Exception
+     *   Thrown if deploy.git.failOnDirty is TRUE and there are uncommitted
+     *   changes.
+     */
+    protected function checkDirty($options) {
+      exec('git status --porcelain', $result, $return);
+      if (!$options['ignore-dirty'] && $return !== 0) {
+        throw new \Exception("Unable to determine if local git repository is dirty.");
+      }
+
+      $dirty = (bool) $result;
+      if ($dirty) {
+        if ($options['ignore-dirty']) {
+          $this->io->warning("There are uncommitted changes on the source repository.");
+        }
+        else {
+          throw new \Exception("There are uncommitted changes, commit or stash these changes before running git-build.");
+        }
+      }
     }
 }
