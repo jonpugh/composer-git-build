@@ -388,7 +388,7 @@ class Command extends BaseCommand
     
         $this->say("Altering .gitignore...");
         
-        if (!strpos(file_get_contents('.gitignore'), $this->ignoreDelimeter)) {
+        if (strpos(file_get_contents('.gitignore'), $this->ignoreDelimeter) === FALSE) {
             $this->say("The git build ignore delimiter was not found in your .gitignore file. All entries will be removed from your .gitignore file. Add '{$this->ignoreDelimeter} to save entries to .gitignore in the build.");
         }
         $this->shell_exec("sed -i '1,/{$this->ignoreDelimeter}/d' .gitignore");
