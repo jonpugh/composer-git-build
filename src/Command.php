@@ -227,13 +227,13 @@ class Command extends BaseCommand
         return $this->shell_exec('git rev-parse --show-toplevel', getcwd());
     }
     
-    protected function shell_exec($cmd, $dir = '') {
+    protected function shell_exec($cmd, $dir = '', $stop_on_fail = TRUE) {
         $oldWorkingDir = getcwd();
         chdir($dir? $dir: getcwd());
         exec($cmd, $output, $return);
         $output = trim(implode("\n", $output));
         chdir($oldWorkingDir);
-        if ($return !== 0) {
+        if ($return !== 0 && $stop_on_fail) {
             throw new \ErrorException("The command `$cmd` failed with exit code $return.", $return);
         }
         return $output;
@@ -403,23 +403,6 @@ class Command extends BaseCommand
             $this->shell_exec("git init", $this->deployDir);
         }
     
-        $this->say("Altering .gitignore...");
-        
-        if (strpos(file_get_contents($this->deployDir . '/.gitignore'), $this->ignoreDelimeter) === FALSE) {
-            $this->say("The git build ignore delimiter was not found in your .gitignore file. All entries will be removed from your .gitignore file. Add '{$this->ignoreDelimeter} to save entries to .gitignore in the build.");
-        }
-        
-        $this->shell_exec("sed -i '1,/{$this->ignoreDelimeter}/d' .gitignore", $this->deployDir);
-
-        if ($this->getConfigValue("git.user.name") &&
-            $this->getConfigValue("git.user.email")) {
-            $git_user = $this->getConfigValue("git.user.name");
-            $git_email = $this->getConfigValue("git.user.email");
-            $this->shell_exec("git config --local --add user.name '$git_user'", $this->deployDir);
-            $this->shell_exec(
-                "git config --local --add user.email '$git_email'"
-                , $this->deployDir);
-        }
             //              $this->taskExecStack()
 //                ->setVerbosityThreshold(VerbosityThresholdInterface::VERBOSITY_VERBOSE)
 //                ->stopOnFail()
@@ -478,6 +461,7 @@ class Command extends BaseCommand
      */
     protected function addGitRemote($remote_url) {
         $this->say("Fetching from git remote $remote_url");
+        
         // Generate an md5 sum of the remote URL to use as remote name.
         $remote_name = md5($remote_url);
         
@@ -530,8 +514,8 @@ class Command extends BaseCommand
         $remote_name = md5($remote_url);
         
         $this->say("Merging upstream changes into local artifact...");
-        $this->shell_exec("git fetch $remote_name {$this->branchName}", $this->deployDir);
-        $this->shell_exec("git merge $remote_name/{$this->branchName}", $this->deployDir);
+        $this->shell_exec("git fetch $remote_name {$this->branchName}", $this->deployDir, FALSE);
+        $this->shell_exec("git merge $remote_name/{$this->branchName}", $this->deployDir, FALSE);
         
         //    $this->taskExecStack()
         //      ->dir($this->deployDir)
@@ -550,6 +534,25 @@ class Command extends BaseCommand
      * @command deploy:build
      */
     public function build() {
+    
+        $this->say("Altering .gitignore...");
+    
+        if (strpos(file_get_contents($this->deployDir . '/.gitignore'), $this->ignoreDelimeter) === FALSE) {
+            $this->say("The git build ignore delimiter was not found in your .gitignore file. All entries will be removed from your .gitignore file. Add '{$this->ignoreDelimeter} to save entries to .gitignore in the build.");
+        }
+    
+        $this->shell_exec("sed -i '1,/{$this->ignoreDelimeter}/d' .gitignore", $this->deployDir);
+    
+        if ($this->getConfigValue("git.user.name") &&
+            $this->getConfigValue("git.user.email")) {
+            $git_user = $this->getConfigValue("git.user.name");
+            $git_email = $this->getConfigValue("git.user.email");
+            $this->shell_exec("git config --local --add user.name '$git_user'", $this->deployDir);
+            $this->shell_exec(
+                "git config --local --add user.email '$git_email'"
+                , $this->deployDir);
+        }
+        
         $this->say("Generating build artifact...");
         $this->say("For more detailed output, use the -v flag.");
         //    $this->invokeCommands([
@@ -573,6 +576,7 @@ class Command extends BaseCommand
         }
         //    $this->invokeHook("post-deploy-build");
         $this->say("<info>The deployment artifact was generated at {$this->deployDir}.</info>");
+        
     }
     
     /**
