@@ -106,7 +106,8 @@ class Command extends BaseCommand
     public function initialize(InputInterface $input, OutputInterface $output) {
 
         $this->workingDir = $this->getWorkingDir($input);
-        $this->deployDir = $input->getOption('build-directory')? $input->getOption('build-directory'): $this->workingDir;
+        $deployDir = getcwd() . '/' . $input->getOption('build-directory');
+        $this->deployDir = $deployDir? $deployDir: $this->workingDir;
         
         $this->io = new Style($input, $output);
         $this->logger = $this->io;
@@ -140,14 +141,12 @@ class Command extends BaseCommand
         $this->io->text('Determining git information for directory ' . $this->workingDir);
         
         // Get and Check Repo Directory.
-        $this->deployDir = $this->shell_exec('git rev-parse --show-toplevel', $this->workingDir);
-        
         if (empty($this->deployDir)) {
             $this->io->error('No git repository found in composer project located at ' . $this->workingDir);
             exit(1);
         }
         else {
-            $this->io->comment('Found git working copy in folder: ' .  $this->deployDir);
+            $this->io->comment('Found git working copy in folder: ' .  $this->workingDir);
         }
         
         // Get and Check Current git reference.
@@ -159,7 +158,10 @@ class Command extends BaseCommand
             $this->io->error('No git reference detected in ' . $this->workingDir);
             exit(1);
         }
-        
+    
+        $this->io->comment('Creating build in directory: ' .  $this->deployDir);
+    
+    
         if (!$options['tag'] && !$options['branch']) {
             $this->io->comment("Typically, you would only create a tag if you currently have a tag checked out on your source repository.");
             $this->createTag = $this->io->confirm("Would you like to create a tag?", $this->createTag);
@@ -202,7 +204,7 @@ class Command extends BaseCommand
      * Gets the default branch name for the deployment artifact.
      */
     protected function getCurrentBranchName() {
-        return $this->shell_exec("git rev-parse --abbrev-ref HEAD", $this->deployDir);
+        return $this->shell_exec("git rev-parse --abbrev-ref HEAD", $this->workingDir);
     }
     
     //    /**
@@ -222,7 +224,7 @@ class Command extends BaseCommand
      */
     private function getWorkingDir(InputInterface $input)
     {
-        return getcwd();
+        return $this->shell_exec('git rev-parse --show-toplevel', getcwd());
     }
     
     protected function shell_exec($cmd, $dir = '') {
