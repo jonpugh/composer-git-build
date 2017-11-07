@@ -21,9 +21,10 @@ In your composer project:
 In your .gitignore:
 
 ```
-### INCLUDE IN COMPOSER GIT BUILD ### 
-# Items below this line will be removed by `git-build` command.
-# Code in these folders will be automatically committed.
+
+## IGNORED IN GIT BUILD: ##
+# Items below this line will retained in artifacts built with the `composer git-build` command.
+
 ```
 (Not Yet Functional!)
 
