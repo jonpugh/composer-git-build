@@ -63,19 +63,19 @@ class Command extends BaseCommand
         
         $this->addOption(
             'build-directory',
-            'd',
+            'b',
             InputOption::VALUE_OPTIONAL,
             'Directory to create the git artifact. Defaults to the current project directory.'
         );
         $this->addOption(
             'branch',
-            'b',
+            NULL,
             InputOption::VALUE_REQUIRED,
             'Branch to create.'
         );
         $this->addOption(
             'tag',
-            't',
+            NULL,
             InputOption::VALUE_REQUIRED,
             'Tag to create.'
         );
