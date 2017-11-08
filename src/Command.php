@@ -617,43 +617,44 @@ class Command extends BaseCommand
         
     }
     
-    /**
-     * Copies files from source repo into artifact.
-     */
-    protected function buildCopy() {
-        
-        if (!$this->getConfigValue('deploy.build-dependencies')) {
-            $this->logger->warning("Dependencies will not be built because deploy.build-dependencies is not enabled");
-            $this->logger->warning("You should define a custom deploy.exclude_file to ensure that dependencies are copied from the root repository.");
-            
-            return FALSE;
-        }
-        
-        $exclude_list_file = $this->getExcludeListFile();
-        $source = $this->getConfigValue('repo.root');
-        $dest = $this->buildDir;
-        
-        $this->setMultisiteFilePermissions(0777);
-        $this->say("Rsyncing files from source repo into the build artifact...");
-        $this->taskExecStack()->exec("rsync -a --no-g --delete --delete-excluded --exclude-from='$exclude_list_file' '$source/' '$dest/' --filter 'protect /.git/'")
-            ->setVerbosityThreshold(VerbosityThresholdInterface::VERBOSITY_VERBOSE)
-            ->stopOnFail()
-            ->dir($this->getConfigValue('repo.root'))
-            ->run();
-        $this->setMultisiteFilePermissions(0755);
-        
-        // Remove temporary file that may have been created by
-        // $this->getExcludeListFile().
-        $this->taskFilesystemStack()
-            ->remove($this->excludeFileTemp)
-            ->copy(
-                $this->getConfigValue('deploy.gitignore_file'),
-                $this->buildDir . '/.gitignore', TRUE
-            )
-            ->setVerbosityThreshold(VerbosityThresholdInterface::VERBOSITY_VERBOSE)
-            ->run();
-        
-    }
+// @TODO: Figure out why this is needed. We use git pull and alter .gitignore to get all files into buildDir().
+//    /**
+//     * Copies files from source repo into artifact.
+//     */
+//    protected function buildCopy() {
+//
+//        if (!$this->getConfigValue('deploy.build-dependencies')) {
+//            $this->logger->warning("Dependencies will not be built because deploy.build-dependencies is not enabled");
+//            $this->logger->warning("You should define a custom deploy.exclude_file to ensure that dependencies are copied from the root repository.");
+//
+//            return FALSE;
+//        }
+//
+//        $exclude_list_file = $this->getExcludeListFile();
+//        $source = $this->getConfigValue('repo.root');
+//        $dest = $this->buildDir;
+//
+//        $this->setMultisiteFilePermissions(0777);
+//        $this->say("Rsyncing files from source repo into the build artifact...");
+//        $this->taskExecStack()->exec("rsync -a --no-g --delete --delete-excluded --exclude-from='$exclude_list_file' '$source/' '$dest/' --filter 'protect /.git/'")
+//            ->setVerbosityThreshold(VerbosityThresholdInterface::VERBOSITY_VERBOSE)
+//            ->stopOnFail()
+//            ->dir($this->getConfigValue('repo.root'))
+//            ->run();
+//        $this->setMultisiteFilePermissions(0755);
+//
+//        // Remove temporary file that may have been created by
+//        // $this->getExcludeListFile().
+//        $this->taskFilesystemStack()
+//            ->remove($this->excludeFileTemp)
+//            ->copy(
+//                $this->getConfigValue('deploy.gitignore_file'),
+//                $this->buildDir . '/.gitignore', TRUE
+//            )
+//            ->setVerbosityThreshold(VerbosityThresholdInterface::VERBOSITY_VERBOSE)
+//            ->run();
+//
+//    }
     
     /**
      * Installs composer dependencies for artifact.
@@ -733,51 +734,51 @@ class Command extends BaseCommand
         //    $taskFilesystemStack->run();
     }
     
-    /**
-     * Gets the file that lists the excludes for the artifact.
-     */
-    protected function getExcludeListFile() {
-        $exclude_file = $this->getConfigValue('deploy.exclude_file');
-        $exclude_additions = $this->getConfigValue('deploy.exclude_additions_file');
-        if (file_exists($exclude_additions)) {
-            $this->say("Combining exclusions from deploy.deploy-exclude-additions and deploy.deploy-exclude files...");
-            $exclude_file = $this->mungeExcludeLists($exclude_file, $exclude_additions);
-        }
-        
-        return $exclude_file;
-    }
-    
-    /**
-     * Combines deploy.exclude_file with deploy.exclude_additions_file.
-     *
-     * Creates a temporary file containing the combination.
-     *
-     * @return string
-     *   The filepath to the temporary file containing the combined list.
-     */
-    protected function mungeExcludeLists($file1, $file2) {
-        $file1_contents = file($file1);
-        $file2_contents = file($file2);
-        $merged = array_merge($file1_contents, $file2_contents);
-        $merged_without_dups = array_unique($merged);
-        file_put_contents($this->excludeFileTemp, $merged_without_dups);
-        
-        return $this->excludeFileTemp;
-    }
-    
-    /**
-     * Sets permissions for all multisite directories.
-     */
-    protected function setMultisiteFilePermissions($perms) {
-        $taskFilesystemStack = $this->taskFilesystemStack();
-        $multisites = $this->getConfigValue('multisites');
-        foreach ($multisites as $multisite) {
-            $multisite_dir = $this->getConfigValue('docroot') . '/sites/' . $multisite;
-            $taskFilesystemStack->chmod($multisite_dir, $perms);
-        }
-        $taskFilesystemStack->setVerbosityThreshold(VerbosityThresholdInterface::VERBOSITY_VERBOSE);
-        $taskFilesystemStack->run();
-    }
+//    /**
+//     * Gets the file that lists the excludes for the artifact.
+//     */
+//    protected function getExcludeListFile() {
+//        $exclude_file = $this->getConfigValue('deploy.exclude_file');
+//        $exclude_additions = $this->getConfigValue('deploy.exclude_additions_file');
+//        if (file_exists($exclude_additions)) {
+//            $this->say("Combining exclusions from deploy.deploy-exclude-additions and deploy.deploy-exclude files...");
+//            $exclude_file = $this->mungeExcludeLists($exclude_file, $exclude_additions);
+//        }
+//
+//        return $exclude_file;
+//    }
+//
+//    /**
+//     * Combines deploy.exclude_file with deploy.exclude_additions_file.
+//     *
+//     * Creates a temporary file containing the combination.
+//     *
+//     * @return string
+//     *   The filepath to the temporary file containing the combined list.
+//     */
+//    protected function mungeExcludeLists($file1, $file2) {
+//        $file1_contents = file($file1);
+//        $file2_contents = file($file2);
+//        $merged = array_merge($file1_contents, $file2_contents);
+//        $merged_without_dups = array_unique($merged);
+//        file_put_contents($this->excludeFileTemp, $merged_without_dups);
+//
+//        return $this->excludeFileTemp;
+//    }
+//
+//    /**
+//     * Sets permissions for all multisite directories.
+//     */
+//    protected function setMultisiteFilePermissions($perms) {
+//        $taskFilesystemStack = $this->taskFilesystemStack();
+//        $multisites = $this->getConfigValue('multisites');
+//        foreach ($multisites as $multisite) {
+//            $multisite_dir = $this->getConfigValue('docroot') . '/sites/' . $multisite;
+//            $taskFilesystemStack->chmod($multisite_dir, $perms);
+//        }
+//        $taskFilesystemStack->setVerbosityThreshold(VerbosityThresholdInterface::VERBOSITY_VERBOSE);
+//        $taskFilesystemStack->run();
+//    }
     
     /**
      * Creates a commit on the artifact.
