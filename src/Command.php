@@ -30,16 +30,22 @@ class Command extends BaseCommand
     protected $io;
     
     /**
-     * The directory containing composer.json.
+     * The directory containing composer.json. Loaded from composer option --working-dir.
      * @var String
      */
     protected $workingDir;
     
     /**
+     * The directory at the root of the git repository.
+     * @var String
+     */
+    protected $gitDir;
+    
+    /**
      * The directory containing the git repository.
      * @var String
      */
-    protected $deployDir;
+    protected $buildDir;
     
     /**
      * The git reference of this project before any changes are made.
@@ -62,10 +68,10 @@ class Command extends BaseCommand
         $this->setDescription('Add all vendor code and ignored dependencies to git.');
         
         $this->addOption(
-            'build-directory',
+            'build-dir',
             'b',
             InputOption::VALUE_OPTIONAL,
-            'Directory to create the git artifact. Defaults to the current project directory.'
+            'Directory to create the git artifact. Defaults to the composer working-dir option.'
         );
         $this->addOption(
             'branch',
@@ -100,24 +106,30 @@ class Command extends BaseCommand
     }
     
     /**
-     * Set workingDir and deployDir.
-     * deployDir is workingDir in our tool. We are trying to avoid creating a separate deploy dir.
+     * Set workingDir and buildDir.
+     * buildDir is workingDir in our tool. We are trying to avoid creating a separate deploy dir.
      */
     public function initialize(InputInterface $input, OutputInterface $output) {
-
-        $this->workingDir = $this->getWorkingDir($input);
-        $deployDir = getcwd() . '/' . $input->getOption('build-directory');
-        $this->deployDir = $deployDir? $deployDir: $this->workingDir;
-        
+    
         $this->io = new Style($input, $output);
+        $this->input = $input;
+        $this->output = $input;
         $this->logger = $this->io;
+    
+        // Using $input->getOption() does not work here because working-dir option is not set if you are already in the dir.
+        // Composer always sets the cwd to the working-dir option.
+        $this->workingDir = getcwd();
+        $this->gitDir = $this->getGitDir();
         
         $config_defaults = [
-            'repo.root' => $this->deployDir,
+            'repo.root' => $this->gitDir,
         ];
 
         $this->config = array_merge($config_defaults, $this->getComposer()->getPackage()->getConfig());
-        
+    
+        $this->io->title("Preparing for Build");
+        $this->buildDir = $this->getBuildDir();
+    
     }
     
     /**
@@ -138,29 +150,32 @@ class Command extends BaseCommand
         }
         $this->checkDirty($options);
         
-        $this->io->title("Preparing for Build");
         $this->say("Composer working directory: <comment>{$this->workingDir}</comment>");
-        
-        // Get and Check Repo Directory.
-        if (empty($this->deployDir)) {
-            $this->io->error('No git repository found in composer project located at ' . $this->workingDir);
-            exit(1);
-        }
-        else {
-            $this->say("Found git working copy in folder: <comment>{$this->workingDir}</comment>");
-        }
-        
+    
         // Get and Check Current git reference.
         if ($this->getCurrentBranchName()) {
             $this->initialGitRef = $this->getCurrentBranchName();
-            $this->say("Found current git reference: <comment>{$this->initialGitRef}</comment>");
+            $this->say("Current git reference: <comment>{$this->initialGitRef}</comment>");
         }
         else {
             $this->io->error('No git reference detected in ' . $this->workingDir);
             exit(1);
         }
+        
+        if (realpath($this->buildDir) == $this->gitDir) {
+            $this->buildDir = realpath($this->buildDir);
+            $this->say("Build Directory: <comment>$this->buildDir</comment> <warning>Building in place. Data will be altered.</warning>");
+        }
+        elseif (file_exists($this->buildDir)) {
+            $this->say("Build Directory: <comment>$this->buildDir</comment> <error>Directory already exists. Data will be destroyed!</error>");
     
-        $this->say("Creating build in directory: <comment>$this->deployDir</comment>");
+        }
+        else {
+            $this->say("Build Directory: <comment>$this->buildDir</comment>");
+    
+        }
+
+    
     
         if (!$options['tag'] && !$options['branch']) {
 //            $this->say("Typically, you would only create a tag if you currently have a tag checked out on your source repository.");
@@ -216,18 +231,18 @@ class Command extends BaseCommand
     //    }
     
     /**
-     * Just return the cwd. Composer automatically sets CWD to the working-dir option.
-     *
-     * @param  InputInterface    $input
-     * @throws \RuntimeException
+     * Find the git repo directory that contains the workingDir.
      * @return string
      */
-    private function getWorkingDir(InputInterface $input)
+    private function getGitDir()
     {
-        return $this->shell_exec('git rev-parse --show-toplevel', getcwd());
+        return $this->shell_exec('git rev-parse --show-toplevel', $this->workingDir);
     }
     
     protected function shell_exec($cmd, $dir = '', $stop_on_fail = TRUE) {
+        if ($dir && !file_exists($dir)) {
+            throw new \Exception("Directory $dir does not exist in " . getcwd());
+        }
         $oldWorkingDir = getcwd();
         chdir($dir? $dir: getcwd());
         exec($cmd, $output, $return);
@@ -299,6 +314,29 @@ class Command extends BaseCommand
             $this->io->comment("Commit message is set to <comment>{$options['commit-msg']}</comment>.");
             return $options['commit-msg'];
         }
+    }
+    
+    /**
+     * Gets the build dir either from an option or from asking the user.
+     *
+     * Defaults to the current workingDir.
+     *
+     * @return string
+     *   The branch name.
+     */
+    protected function getBuildDir() {
+        $options = $this->input->getOptions();
+        if (!$options['build-dir']) {
+            $options['build-dir'] = $this->askDefault('Enter the directory to build the git repo in', $this->workingDir);
+        }
+        
+        // If not an absolute path, append cwd.
+        if (strpos($options['build-dir'], '/') !== 0) {
+            $options['build-dir'] = getcwd() . '/' . $options['build-dir'];
+        }
+    
+        $this->input->setOption('build-dir', $options['build-dir']);
+        return $options['build-dir'];
     }
     
     /**
@@ -397,26 +435,26 @@ class Command extends BaseCommand
      */
     protected function prepareDir() {
         $this->say("Preparing artifact directory...");
-        if ($this->deployDir != $this->workingDir) {
-            $this->shell_exec("rm -rf $this->deployDir");
-            $this->shell_exec("mkdir $this->deployDir");
-            $this->shell_exec("git init", $this->deployDir);
+        if ($this->buildDir != $this->workingDir) {
+            $this->shell_exec("rm -rf $this->buildDir");
+            $this->shell_exec("mkdir $this->buildDir");
+            $this->shell_exec("git init", $this->buildDir);
         }
     
             //              $this->taskExecStack()
 //                ->setVerbosityThreshold(VerbosityThresholdInterface::VERBOSITY_VERBOSE)
 //                ->stopOnFail()
-//                ->dir($this->deployDir)
+//                ->dir($this->buildDir)
 //                ->exec("git config --local --add user.name '$git_user'")
 //                ->exec("git config --local --add user.email '$git_email'")
 //                ->run();
 //            }
-        //            $deploy_dir = $this->deployDir;
+        //            $deploy_dir = $this->buildDir;
 //            $this->taskDeleteDir($deploy_dir)
 //              ->setVerbosityThreshold(VerbosityThresholdInterface::VERBOSITY_VERBOSE)
 //              ->run();
 //            $this->taskFilesystemStack()
-//              ->mkdir($this->deployDir)
+//              ->mkdir($this->buildDir)
 //              ->setVerbosityThreshold(VerbosityThresholdInterface::VERBOSITY_VERBOSE)
 //              ->stopOnFail()
 //              ->run();
@@ -435,7 +473,7 @@ class Command extends BaseCommand
 //              $this->taskExecStack()
 //                ->setVerbosityThreshold(VerbosityThresholdInterface::VERBOSITY_VERBOSE)
 //                ->stopOnFail()
-//                ->dir($this->deployDir)
+//                ->dir($this->buildDir)
 //                ->exec("git config --local --add user.name '$git_user'")
 //                ->exec("git config --local --add user.email '$git_email'")
 //                ->run();
@@ -467,7 +505,7 @@ class Command extends BaseCommand
         
         // Remote may already exist.
         try {
-            $this->shell_exec("git remote add $remote_name $remote_url", $this->deployDir);
+            $this->shell_exec("git remote add $remote_name $remote_url", $this->buildDir);
         }
         catch (\ErrorException $e) {
             if ($e->getCode() == 128) {
@@ -481,7 +519,7 @@ class Command extends BaseCommand
         //    $this->taskExecStack()
         //      ->stopOnFail()
         //      ->setVerbosityThreshold(VerbosityThresholdInterface::VERBOSITY_VERBOSE)
-        //      ->dir($this->deployDir)
+        //      ->dir($this->buildDir)
         //      ->exec("git remote add $remote_name $remote_url")
         //      ->run();
         
@@ -491,8 +529,8 @@ class Command extends BaseCommand
      * Checks out a new, local branch for artifact.
      */
     protected function checkoutLocalDeployBranch() {
-        //    $this->taskExecStack()
-        //      ->dir($this->deployDir)
+        //    $this->taskExecStack()g
+        //      ->dir($this->buildDir)
         //      // Create new branch locally.We intentionally use stopOnFail(FALSE) in
         //      // case the branch already exists. `git checkout -B` does not seem to work
         //      // as advertised.
@@ -502,7 +540,7 @@ class Command extends BaseCommand
         //      ->exec("git checkout -b {$this->branchName}")
         //      ->run();
         
-        $this->shell_exec("git checkout -b {$this->branchName}", $this->deployDir);
+        $this->shell_exec("git checkout -b {$this->branchName}", $this->buildDir);
     }
     
     /**
@@ -514,11 +552,11 @@ class Command extends BaseCommand
         $remote_name = md5($remote_url);
         
         $this->say("Merging upstream changes into local artifact...");
-        $this->shell_exec("git fetch $remote_name {$this->branchName}", $this->deployDir, FALSE);
-        $this->shell_exec("git merge $remote_name/{$this->branchName}", $this->deployDir, FALSE);
+        $this->shell_exec("git fetch $remote_name {$this->branchName}", $this->buildDir, FALSE);
+        $this->shell_exec("git merge $remote_name/{$this->branchName}", $this->buildDir, FALSE);
         
         //    $this->taskExecStack()
-        //      ->dir($this->deployDir)
+        //      ->dir($this->buildDir)
         //      // This branch may not exist upstream, so we do not fail the build if a
         //      // merge fails.
         //      ->stopOnFail(FALSE)
@@ -537,20 +575,20 @@ class Command extends BaseCommand
     
         $this->say("Altering .gitignore...");
     
-        if (strpos(file_get_contents($this->deployDir . '/.gitignore'), $this->ignoreDelimeter) === FALSE) {
+        if (strpos(file_get_contents($this->buildDir . '/.gitignore'), $this->ignoreDelimeter) === FALSE) {
             $this->say("The git build ignore delimiter was not found in your .gitignore file. All entries will be removed from your .gitignore file. Add '{$this->ignoreDelimeter} to save entries to .gitignore in the build.");
         }
     
-        $this->shell_exec("sed -i '1,/{$this->ignoreDelimeter}/d' .gitignore", $this->deployDir);
+        $this->shell_exec("sed -i '1,/{$this->ignoreDelimeter}/d' .gitignore", $this->buildDir);
     
         if ($this->getConfigValue("git.user.name") &&
             $this->getConfigValue("git.user.email")) {
             $git_user = $this->getConfigValue("git.user.name");
             $git_email = $this->getConfigValue("git.user.email");
-            $this->shell_exec("git config --local --add user.name '$git_user'", $this->deployDir);
+            $this->shell_exec("git config --local --add user.name '$git_user'", $this->buildDir);
             $this->shell_exec(
                 "git config --local --add user.email '$git_email'"
-                , $this->deployDir);
+                , $this->buildDir);
         }
         
         $this->say("Generating build artifact...");
@@ -575,7 +613,7 @@ class Command extends BaseCommand
             $this->createDeployId(RandomString::string(8));
         }
         //    $this->invokeHook("post-deploy-build");
-        $this->say("<info>The deployment artifact was generated at {$this->deployDir}.</info>");
+        $this->say("<info>The deployment artifact was generated at {$this->buildDir}.</info>");
         
     }
     
@@ -593,7 +631,7 @@ class Command extends BaseCommand
         
         $exclude_list_file = $this->getExcludeListFile();
         $source = $this->getConfigValue('repo.root');
-        $dest = $this->deployDir;
+        $dest = $this->buildDir;
         
         $this->setMultisiteFilePermissions(0777);
         $this->say("Rsyncing files from source repo into the build artifact...");
@@ -610,7 +648,7 @@ class Command extends BaseCommand
             ->remove($this->excludeFileTemp)
             ->copy(
                 $this->getConfigValue('deploy.gitignore_file'),
-                $this->deployDir . '/.gitignore', TRUE
+                $this->buildDir . '/.gitignore', TRUE
             )
             ->setVerbosityThreshold(VerbosityThresholdInterface::VERBOSITY_VERBOSE)
             ->run();
@@ -622,18 +660,18 @@ class Command extends BaseCommand
      */
     protected function composerInstall() {
         $this->say("Rebuilding composer dependencies for production...");
-        $this->shell_exec("composer install --no-dev --no-interaction --optimize-autoloader", $this->deployDir);
-        //    $this->taskDeleteDir([$this->deployDir . '/vendor'])
+        $this->shell_exec("composer install --no-dev --no-interaction --optimize-autoloader", $this->buildDir);
+        //    $this->taskDeleteDir([$this->buildDir . '/vendor'])
         //      ->setVerbosityThreshold(VerbosityThresholdInterface::VERBOSITY_VERBOSE)
         //      ->run();
         //    $this->taskFilesystemStack()
-        //      ->copy($this->getConfigValue('repo.root') . '/composer.json', $this->deployDir . '/composer.json', TRUE)
-        //      ->copy($this->getConfigValue('repo.root') . '/composer.lock', $this->deployDir . '/composer.lock', TRUE)
+        //      ->copy($this->getConfigValue('repo.root') . '/composer.json', $this->buildDir . '/composer.json', TRUE)
+        //      ->copy($this->getConfigValue('repo.root') . '/composer.lock', $this->buildDir . '/composer.lock', TRUE)
         //      ->setVerbosityThreshold(VerbosityThresholdInterface::VERBOSITY_VERBOSE)
         //      ->run();
         //    $this->taskExecStack()->exec("composer install --no-dev --no-interaction --optimize-autoloader")
         //      ->stopOnFail()
-        //      ->dir($this->deployDir)
+        //      ->dir($this->buildDir)
         //      ->run();
     }
     
@@ -642,7 +680,7 @@ class Command extends BaseCommand
      */
     protected function createDeployId($id) {
         //    $this->taskExecStack()->exec("echo '$id' > deployment_identifier")
-        //      ->dir($this->deployDir)
+        //      ->dir($this->buildDir)
         //      ->stopOnFail()
         //      ->setVerbosityThreshold(VerbosityThresholdInterface::VERBOSITY_VERBOSE)
         //      ->run();
@@ -657,11 +695,11 @@ class Command extends BaseCommand
         
         $this->logger->comment("Removing .git subdirectories...");
         
-        $this->shell_exec("find '{$this->deployDir}/vendor' -type d | grep '\.git' | xargs rm -rf", $this->deployDir);
-        $this->shell_exec("find '{$this->deployDir}/docroot' -type d | grep '\.git' | xargs rm -rf", $this->deployDir);
+        $this->shell_exec("find '{$this->buildDir}/vendor' -type d | grep '\.git' | xargs rm -rf", $this->buildDir);
+        $this->shell_exec("find '{$this->buildDir}/docroot' -type d | grep '\.git' | xargs rm -rf", $this->buildDir);
         //    $this->taskExecStack()
-        //      ->exec("find '{$this->deployDir}/vendor' -type d | grep '\.git' | xargs rm -rf")
-        //      ->exec("find '{$this->deployDir}/docroot' -type d | grep '\.git' | xargs rm -rf")
+        //      ->exec("find '{$this->buildDir}/vendor' -type d | grep '\.git' | xargs rm -rf")
+        //      ->exec("find '{$this->buildDir}/docroot' -type d | grep '\.git' | xargs rm -rf")
         //      ->stopOnFail()
         //      ->setVerbosityThreshold(VerbosityThresholdInterface::VERBOSITY_VERBOSE)
         //      ->run();
@@ -671,24 +709,24 @@ class Command extends BaseCommand
         
         $finder = new Finder();
         $files = $finder
-            ->in($this->deployDir)
+            ->in($this->buildDir)
             ->files()
             ->name('CHANGELOG.txt');
         
         foreach ($files->getIterator() as $item) {
             $filepath = $item->getRealPath();
-            $this->shell_exec("rm -rf $filepath", $this->deployDir);
+            $this->shell_exec("rm -rf $filepath", $this->buildDir);
         }
         
         $finder = new Finder();
         $files = $finder
-            ->in($this->deployDir . '/docroot/core')
+            ->in($this->buildDir . '/docroot/core')
             ->files()
             ->name('*.txt');
         
         foreach ($files->getIterator() as $item) {
             $filepath = $item->getRealPath();
-            $this->shell_exec("rm -rf $filepath", $this->deployDir);
+            $this->shell_exec("rm -rf $filepath", $this->buildDir);
         }
         
         $this->logger->comment("Removing .txt files...");
@@ -746,11 +784,11 @@ class Command extends BaseCommand
      */
     protected function commit() {
         $this->say("Committing artifact to <comment>{$this->branchName}</comment>...");
-        $this->shell_exec("git add -A", $this->deployDir);
-        $this->shell_exec("git commit --quiet -m '{$this->commitMessage}'", $this->deployDir);
+        $this->shell_exec("git add -A", $this->buildDir);
+        $this->shell_exec("git commit --quiet -m '{$this->commitMessage}'", $this->buildDir);
         
         //    $result = $this->taskExecStack()
-        //      ->dir($this->deployDir)
+        //      ->dir($this->buildDir)
         //      ->exec("git add -A")
         //      ->exec("git commit --quiet -m '{$this->commitMessage}'")
         //      ->setVerbosityThreshold(VerbosityThresholdInterface::VERBOSITY_VERBOSE)
@@ -774,10 +812,10 @@ class Command extends BaseCommand
         }
         
         //    $task = $this->taskExecStack()
-        //      ->dir($this->deployDir);
+        //      ->dir($this->buildDir);
         foreach ($this->getConfigValue('git.remotes') as $remote) {
             $remote_name = md5($remote);
-            $this->shell_exec("git push $remote_name $identifier", $this->deployDir);
+            $this->shell_exec("git push $remote_name $identifier", $this->buildDir);
             //      $task->exec("git push $remote_name $identifier");
             
         }
@@ -793,12 +831,12 @@ class Command extends BaseCommand
      */
     protected function cutTag() {
         
-        $this->shell_exec("git tag -a {$this->tagName} -m '{$this->commitMessage}'", $this->deployDir);
+        $this->shell_exec("git tag -a {$this->tagName} -m '{$this->commitMessage}'", $this->buildDir);
         //    $this->taskExecStack()
         //      ->exec("git tag -a {$this->tagName} -m '{$this->commitMessage}'")
         //      ->setVerbosityThreshold(VerbosityThresholdInterface::VERBOSITY_VERBOSE)
         //      ->stopOnFail()
-        //      ->dir($this->deployDir)
+        //      ->dir($this->buildDir)
         //      ->run();
         $this->say("The tag {$this->tagName} was created for the build artifact.");
     }
@@ -818,13 +856,13 @@ class Command extends BaseCommand
      * Checkout initial git reference.
      */
     protected function cleanup() {
-        if ($this->workingDir == $this->deployDir) {
+        if ($this->workingDir == $this->buildDir) {
             $this->say("Returning {$this->workingDir} to git reference {$this->initialGitRef}...");
             $this->shell_exec("git checkout {$this->initialGitRef}", $this->workingDir);
 
             $this->say("Deleting temporary branch...");
             $branch_name = $this->getDefaultBranchName() . '-temp';
-            $this->shell_exec("git branch -D {$branch_name}", $this->workingDir, $this->deployDir);
+            $this->shell_exec("git branch -D {$branch_name}", $this->workingDir, $this->buildDir);
         }
     
     }
