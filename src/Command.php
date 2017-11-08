@@ -552,8 +552,8 @@ class Command extends BaseCommand
         $remote_name = md5($remote_url);
         
         $this->say("Merging upstream changes into local artifact...");
-        $this->shell_exec("git fetch $remote_name {$this->branchName}", $this->buildDir, FALSE);
-        $this->shell_exec("git merge $remote_name/{$this->branchName}", $this->buildDir, FALSE);
+        $this->shell_exec("git fetch $remote_name {$this->initialGitRef}", $this->buildDir, FALSE);
+        $this->shell_exec("git merge $remote_name/{$this->initialGitRef}", $this->buildDir, FALSE);
         
         //    $this->taskExecStack()
         //      ->dir($this->buildDir)
