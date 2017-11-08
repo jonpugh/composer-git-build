@@ -610,7 +610,7 @@ class Command extends BaseCommand
             $this->createDeployId($this->tagName);
         }
         else {
-            $this->createDeployId(RandomString::string(8));
+            $this->createDeployId(uniqid());
         }
         //    $this->invokeHook("post-deploy-build");
         $this->say("<info>The deployment artifact was generated at {$this->buildDir}.</info>");
