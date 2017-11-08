@@ -138,7 +138,8 @@ class Command extends BaseCommand
         }
         $this->checkDirty($options);
         
-        $this->io->text('Determining git information for directory ' . $this->workingDir);
+        $this->io->title("Preparing for Build");
+        $this->say("Composer working directory: <comment>{$this->workingDir}</comment>");
         
         // Get and Check Repo Directory.
         if (empty($this->deployDir)) {
@@ -146,24 +147,23 @@ class Command extends BaseCommand
             exit(1);
         }
         else {
-            $this->io->comment('Found git working copy in folder: ' .  $this->workingDir);
+            $this->say("Found git working copy in folder: <comment>{$this->workingDir}</comment>");
         }
         
         // Get and Check Current git reference.
         if ($this->getCurrentBranchName()) {
-            $this->io->comment('Found current git reference: ' .  $this->getCurrentBranchName());
             $this->initialGitRef = $this->getCurrentBranchName();
+            $this->say("Found current git reference: <comment>{$this->initialGitRef}</comment>");
         }
         else {
             $this->io->error('No git reference detected in ' . $this->workingDir);
             exit(1);
         }
     
-        $this->io->comment('Creating build in directory: ' .  $this->deployDir);
-    
+        $this->say("Creating build in directory: <comment>$this->deployDir</comment>");
     
         if (!$options['tag'] && !$options['branch']) {
-            $this->io->comment("Typically, you would only create a tag if you currently have a tag checked out on your source repository.");
+//            $this->say("Typically, you would only create a tag if you currently have a tag checked out on your source repository.");
             $this->createTag = $this->io->confirm("Would you like to create a tag?", $this->createTag);
         }
         $this->commitMessage = $this->getCommitMessage($options);
