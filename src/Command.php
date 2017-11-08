@@ -409,6 +409,9 @@ class Command extends BaseCommand
         $this->prepareDir();
         $this->addGitRemotes();
         $this->checkoutLocalDeployBranch();
+        
+        // Added this to deployTag, because we're not running buildCopy anymore.
+        $this->mergeUpstreamChanges();
         $this->build();
         $this->commit();
         $this->cutTag();
