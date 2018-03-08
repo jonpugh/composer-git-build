@@ -595,7 +595,7 @@ class Command extends BaseCommand
      * Merges upstream changes into deploy branch.
      */
     protected function mergeUpstreamChanges() {
-        $git_remotes = $this->config['git']['remotes'];
+        $git_remotes = $this->git_remotes;
         $remote_url = reset($git_remotes);
         $remote_name = md5($remote_url);
         
