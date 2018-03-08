@@ -65,6 +65,12 @@ class Command extends BaseCommand
      * @var string[]
      */
     protected $git_remotes = [];
+
+    /**
+     * Relative path to exposed document root.
+     * @var string
+     */
+    protected $documentRoot;
     
     protected $ignoreDelimeter = "## IGNORED IN GIT BUILD ARTIFACTS: ##";
     
@@ -85,6 +91,12 @@ class Command extends BaseCommand
             NULL,
             InputOption::VALUE_REQUIRED,
             'Branch to create.'
+        );
+        $this->addOption(
+            'document_root',
+            NULL,
+            InputOption::VALUE_OPTIONAL,
+            'Relative path to exposed document root.'
         );
         $this->addOption(
             'tag',
@@ -157,6 +169,12 @@ class Command extends BaseCommand
           $this->git_remotes = $this->config['git']['remotes'];
         }
 
+        if (empty($options['document_root'])) {
+            $this->documentRoot = $this->ask('Document root');
+        }
+        else {
+            $this->documentRoot = $options['document_root'];
+        }
     }
     
     /**
@@ -178,7 +196,7 @@ class Command extends BaseCommand
         $this->checkDirty($options);
         
         $this->say("Composer working directory: <comment>{$this->workingDir}</comment>");
-    
+
         // Get and Check Current git reference.
         if ($this->getCurrentBranchName()) {
             $this->initialGitRef = $this->getCurrentBranchName();
@@ -201,6 +219,9 @@ class Command extends BaseCommand
             $this->say("Build Directory: <comment>$this->buildDir</comment>");
     
         }
+
+        $documentRoot = $this->documentRoot? $this->documentRoot: 'Repository Root';
+        $this->say("Document Root: <comment>$documentRoot</comment>");
 
         $this->say("Artifact Remote Repositories:");
         foreach ($this->git_remotes as $remote) {
@@ -745,7 +766,7 @@ class Command extends BaseCommand
         $this->logger->comment("Removing .git subdirectories...");
         
         $this->shell_exec("find '{$this->buildDir}/vendor' -type d | grep '\.git' | xargs rm -rf", $this->buildDir);
-        $this->shell_exec("find '{$this->buildDir}/docroot' -type d | grep '\.git' | xargs rm -rf", $this->buildDir);
+        $this->shell_exec("find '{$this->buildDir}/{$this->documentRoot}' -type d | grep '\.git' | xargs rm -rf", $this->buildDir);
         //    $this->taskExecStack()
         //      ->exec("find '{$this->buildDir}/vendor' -type d | grep '\.git' | xargs rm -rf")
         //      ->exec("find '{$this->buildDir}/docroot' -type d | grep '\.git' | xargs rm -rf")
@@ -769,7 +790,7 @@ class Command extends BaseCommand
         
         $finder = new Finder();
         $files = $finder
-            ->in($this->buildDir . '/docroot/core')
+            ->in("{$this->buildDir}/{$this->documentRoot}/core")
             ->files()
             ->name('*.txt');
         
@@ -862,7 +883,7 @@ class Command extends BaseCommand
         
         //    $task = $this->taskExecStack()
         //      ->dir($this->buildDir);
-        foreach ($this->getConfigValue('git.remotes') as $remote) {
+        foreach ($this->git_remotes as $remote) {
             $remote_name = md5($remote);
             $this->shell_exec("git push $remote_name $identifier", $this->buildDir);
             //      $task->exec("git push $remote_name $identifier");
