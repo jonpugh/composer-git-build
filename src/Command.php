@@ -150,7 +150,7 @@ class Command extends BaseCommand
       }
   }
   ');
-          $this->git_remotes[] = $this->ask('Remote Artifact Git repository', $this->getCurrentBranchName());
+          $this->git_remotes[] = $this->askDefault('Remote Artifact Git repository', $this->getCurrentRemoteUrl());
         }
         else {
           $this->git_remotes = $this->config['git']['remotes'];
@@ -247,6 +247,13 @@ class Command extends BaseCommand
      */
     protected function getCurrentBranchName() {
         return $this->shell_exec("git rev-parse --abbrev-ref HEAD", $this->workingDir);
+    }
+
+    /**
+     * Gets the default remote URL from the source repo.
+     */
+    protected function getCurrentRemoteUrl() {
+        return $this->shell_exec("git remote get-url origin", $this->workingDir);
     }
     
     //    /**
@@ -577,7 +584,7 @@ class Command extends BaseCommand
      * Merges upstream changes into deploy branch.
      */
     protected function mergeUpstreamChanges() {
-        $git_remotes = $this->getConfigValue('git.remotes');
+        $git_remotes = $this->config['git']['remotes'];
         $remote_url = reset($git_remotes);
         $remote_name = md5($remote_url);
         
