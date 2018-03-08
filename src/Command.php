@@ -59,6 +59,12 @@ class Command extends BaseCommand
      * @var array
      */
     protected $config = [];
+
+    /**
+     * List of git remotes to push the artifact to.
+     * @var string[]
+     */
+    protected $git_remotes = [];
     
     protected $ignoreDelimeter = "## IGNORED IN GIT BUILD ARTIFACTS: ##";
     
@@ -126,10 +132,30 @@ class Command extends BaseCommand
         ];
 
         $this->config = array_merge($config_defaults, $this->getComposer()->getPackage()->getConfig());
-    
+
         $this->io->title("Preparing for Build");
         $this->buildDir = $this->getBuildDir();
-    
+
+        // Add remotes and fetch upstream refs.
+        if (!isset($this->config['git']) || empty($this->config['git']['remotes'])) {
+
+          $this->io->comment('No git remotes found. You can define the remote repository to push to in composer.json:
+  {
+      "config": {
+          "git": {
+              "remotes": [
+                "git@github.com:org/repo.git"
+              ]
+          }
+      }
+  }
+  ');
+          $this->git_remotes[] = $this->ask('Remote Artifact Git repository', $this->getCurrentBranchName());
+        }
+        else {
+          $this->git_remotes = $this->config['git']['remotes'];
+        }
+
     }
     
     /**
@@ -175,8 +201,9 @@ class Command extends BaseCommand
     
         }
 
-    
-    
+        $this->say("Artifact Remote Repositories:");
+        $this->say("<comment>" . implode("\n ", $this->git_remotes) . "</comment>");
+
         if (!$options['tag'] && !$options['branch']) {
 //            $this->say("Typically, you would only create a tag if you currently have a tag checked out on your source repository.");
             $this->createTag = $this->io->confirm("Would you like to create a tag?", $this->createTag);
@@ -487,12 +514,12 @@ class Command extends BaseCommand
      * Adds remotes from git.remotes to /deploy repository.
      */
     protected function addGitRemotes() {
-        // Add remotes and fetch upstream refs.
-        $git_remotes = $this->getConfigValue('git.remotes');
-        if (empty($git_remotes)) {
-            throw new \Exception("git.remotes is empty. Please define at least one value for git.remotes in composer.json 'config' section.");
-        }
-        foreach ($git_remotes as $remote_url) {
+//        // Add remotes and fetch upstream refs.
+//        $git_remotes = $this->getConfigValue('git.remotes');
+//        if (empty($git_remotes)) {
+//            throw new \Exception("git.remotes is empty. Please define at least one value for git.remotes in composer.json 'config' section.");
+//        }
+        foreach ($this->git_remotes as $remote_url) {
             $this->addGitRemote($remote_url);
         }
     }
