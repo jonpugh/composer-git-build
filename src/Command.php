@@ -77,7 +77,8 @@ class Command extends BaseCommand
             'build-dir',
             'b',
             InputOption::VALUE_OPTIONAL,
-            'Directory to create the git artifact. Defaults to the composer working-dir option.'
+            'Directory to create the git artifact. Defaults to the composer working-dir option.',
+            'build'
         );
         $this->addOption(
             'branch',
@@ -202,7 +203,14 @@ class Command extends BaseCommand
         }
 
         $this->say("Artifact Remote Repositories:");
-        $this->say("<comment>" . implode("\n ", $this->git_remotes) . "</comment>");
+        foreach ($this->git_remotes as $remote) {
+            if ($remote == $this->getCurrentRemoteUrl()) {
+                $this->say("<comment>$remote</comment> <error>Same as artifact remote.</error>");
+            }
+            else {
+                $this->say("<comment>$remote</comment>");
+            }
+        }
 
         if (!$options['tag'] && !$options['branch']) {
 //            $this->say("Typically, you would only create a tag if you currently have a tag checked out on your source repository.");
@@ -362,6 +370,9 @@ class Command extends BaseCommand
         $options = $this->input->getOptions();
         if (!$options['build-dir']) {
             $options['build-dir'] = $this->askDefault('Enter the directory to build the git repo in', $this->workingDir);
+        }
+        else {
+            $options['build-dir'] = $this->askDefault('Enter the directory to build the git repo in', $options['build-dir']);
         }
         
         // If not an absolute path, append cwd.
